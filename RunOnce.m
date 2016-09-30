@@ -2,6 +2,10 @@ function RunOnce(client_id, client_secret)
 % This function collects access tokens for Google API access using OAuth2
 % certification gathered from https://console.developers.google.com/ after
 % enabling the Google Drive and Sheet API.
+% usage: RunOnce(client_id, client_secret)
+%
+% A mat file, google_tokens.mat is created by this file and used by future
+% calls to mat2sheets. Therefore it must be in MATLAB's scope.
 %
 % This is essentially a wrapper for Claudiu Giurumescu's function from the
 % project:
