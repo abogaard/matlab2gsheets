@@ -8,7 +8,9 @@ function status = mat2sheets(spreadsheetID, sheetID, sheetpos, d)
 %       sheetID:        (string), another identier from URL
 %       pos:            1x2 array with indices for [sheetrow, sheetcolumn]
 %                       to start pasting data 
-%       d:              array or cell array of data to paste into Sheet
+%       d:              array or cell array of data to paste into Sheet. If
+%                       [], pos indicates row or range of rows [start stop]
+%                       to delete
 %
 % RETURNS: status  (0=failed, 1=success)
 %
@@ -20,6 +22,10 @@ function status = mat2sheets(spreadsheetID, sheetID, sheetpos, d)
 %       mat2sheets('1GPd-vBsX5VUejz5hrxE', '552', [2 3], [1 2 3 4 5])
 %
 %       Would put values 1,2,3,4,5 into cells C2,D2,E2,F2,G2, respectively
+%
+%       To delete row(s)
+%       mat2sheets('1GPd-vBsX5VUejz5hrxE', '552', 2, []) % delete row 2
+%       mat2sheets('1GPd-vBsX5VUejz5hrxE', '552', [2 10], []) % delete rows 2-10 inclusive
 %
 % USING RunOnce().
 % Before using this code, you've got to enable the Drive/Sheets APIs via:
@@ -48,7 +54,20 @@ status = 0;
 aSheets = refreshAccessToken; % refresh and retrieve access token
 if isempty(aSheets), disp('Cannot do anything without Google API access. See readme'); return; end
 
-% error checking, gather sheet meta data
+% check if this is a delete row operation
+if isempty(d)
+    if numel(sheetpos)==1, sheetpos(2) = sheetpos(1)+1; 
+    elseif numel(sheetpos)==2, sheetpos(2) = sheetpos(2)+1; 
+    else, disp('Warning: delete rows requested but sheetpos is not as expected. Quitting.'); return; 
+    end 
+    
+    status = deleteRows(spreadsheetID, sheetID, sheetpos, aSheets);
+    return
+end
+
+% if not remove row operation, continue below
+
+% if error checking, gather sheet meta data
 if ~iscell(d), d = num2cell(d); end % convert to cell array if not already
 [nR, nC, sheetName] = getSheetMetaData(spreadsheetID, sheetID, aSheets); % to ensure we have enough cells
 maxR = sheetpos(1)+size(d,1)-1; % total theoretical rows needed
@@ -60,6 +79,66 @@ end
 
 %update sheet
 status = pasteSheetData(spreadsheetID, sheetName, sheetpos, d, aSheets);
+
+%--------------------------------------------------------------------------
+function status = deleteRows(spreadsheetID, sheetID, rowsdel, aSheets)
+
+import java.io.*;
+import java.net.*;
+import java.lang.*;
+com.mathworks.mlwidgets.html.HTMLPrefs.setProxySettings
+
+% parameters
+url = ['https://sheets.googleapis.com/v4/spreadsheets/' spreadsheetID ':batchUpdate'];
+maxiter = 3;
+status = 1;
+
+% build delete request
+request = ['''requests'': [{',...
+                  '''deleteDimension'': {',...
+                        '''range'': {',...
+                            '''sheetId'': ' sheetID ',',...
+                            '''dimension'': ''ROWS'',',...
+                            '''startIndex'': ' num2str(rowsdel(1))-1 ',',...
+                            '''endIndex'': ' num2str(rowsdel(2))-1 ',',...
+                        '}',...
+                  '}',...
+              '}],'];
+
+iter=1;
+success=0;
+while ~success && iter<maxiter    
+    iter=iter+1;
+    con = urlreadwrite(mfilename,url);
+    con.setInstanceFollowRedirects(false);
+    con.setRequestMethod('POST');
+    con.setDoOutput(true);
+    con.setDoInput(true);
+    con.setRequestProperty('Authorization',['Bearer ' aSheets]);
+    con.setRequestProperty('Content-Type','application/json; charset=UTF-8');               
+    con.setRequestProperty('X-Upload-Content-Length', '0');
+    event = ['{',...
+                  request,...
+                '}'];
+
+    con.setRequestProperty('Content-Length', num2str(length(event)));
+            
+    ps = PrintStream(con.getOutputStream());
+    ps.print(event);
+    ps.close();  clear ps event; 
+
+    if (con.getResponseCode()~=200)
+        con.disconnect();
+        continue;
+    end
+    success=true;
+    status = 1;
+end
+
+if ~success
+    status = 0;
+    display(['Failed trying to delete columns. Last response was: ' num2str(con.getResponseCode) '/' con.getResponseMessage().toCharArray()']);
+end
 
 %--------------------------------------------------------------------------
 function status = appendRowsColumns(spreadsheetID, sheetID, rowsadd, colsadd, aSheets)
