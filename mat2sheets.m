@@ -48,6 +48,7 @@ function status = mat2sheets(spreadsheetID, sheetID, sheetpos, d)
 % (https://www.mathworks.com/matlabcentral/fileexchange/33381-jsonlab--a-toolbox-to-encode-decode-json-files)
 %
 % andrew robert bogaard 26 sept 2016
+% updated 25 july 2017 (delete rows)
 % abogaard@uw.edu
 
 status = 0;
