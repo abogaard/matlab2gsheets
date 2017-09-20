@@ -365,18 +365,38 @@ if success
     opt.SimplifyCell = 1;
     jdat = loadjson(j, opt);
     sIds = nan(size(jdat.sheets));
-    for i = 1:numel(jdat.sheets)
-        sIds(i) = jdat.sheets(i).properties.sheetId;
-    end
-    
-    wheresheet = find(sIds==str2double(sheetID));
+    if iscell(jdat.sheets(1)) % test for some weird bug
+        for i = 1:numel(jdat.sheets) 
+            jd = jdat.sheets(i); 
+            jdc = cell2mat(jd); 
+            sIds(i) = jdc.properties.sheetId; 
+        end 
 
-    if ~isempty(wheresheet) && length(wheresheet)==1
-        nRows = jdat.sheets(wheresheet).properties.gridProperties.rowCount;
-        nCols = jdat.sheets(wheresheet).properties.gridProperties.columnCount;
-        sheetName = jdat.sheets(wheresheet).properties.title;
+        wheresheet = find(sIds==str2double(sheetID));
+
+        if ~isempty(wheresheet) && length(wheresheet)==1 
+            jd = jdat.sheets(wheresheet); 
+            jdc = cell2mat(jd); 
+            nRows = jdc.properties.gridProperties.rowCount; 
+            nCols = jdc.properties.gridProperties.columnCount; 
+            sheetName = jdc.properties.title; 
+        else 
+            disp('SheetID doesnt match sheets'); 
+        end 
     else
-        disp('SheetID doesnt match sheets');
+        for i = 1:numel(jdat.sheets)
+            sIds(i) = jdat.sheets(i).properties.sheetId;
+        end
+
+        wheresheet = find(sIds==str2double(sheetID));
+
+        if ~isempty(wheresheet) && length(wheresheet)==1
+            nRows = jdat.sheets(wheresheet).properties.gridProperties.rowCount;
+            nCols = jdat.sheets(wheresheet).properties.gridProperties.columnCount;
+            sheetName = jdat.sheets(wheresheet).properties.title;
+        else
+            disp('SheetID doesnt match sheets');
+        end
     end
     
     con.disconnect();
